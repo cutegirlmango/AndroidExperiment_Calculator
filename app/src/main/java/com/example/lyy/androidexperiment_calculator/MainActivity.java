@@ -86,8 +86,7 @@ public class MainActivity extends AppCompatActivity {
             if(text.equals("+")||text.equals("-")||text.equals("*")||text.equals("/")||text.equals("(")||text.equals(")")){
                 //如果是重复点击这些运算符，不处理
                 if(text.equals("(")){
-
-
+                    
                 }
                 if(expressionString.endsWith("+")||expressionString.endsWith("-")||expressionString.endsWith("*")||
                         expressionString.endsWith("/")){
