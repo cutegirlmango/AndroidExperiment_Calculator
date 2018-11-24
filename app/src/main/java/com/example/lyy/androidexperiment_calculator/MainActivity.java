@@ -3,39 +3,46 @@ package com.example.lyy.androidexperiment_calculator;
 import android.content.res.Configuration;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
 
+import java.text.DecimalFormat;
 import java.util.Stack;
 
 
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
+    //显示的结果栏
     private TextView resultView;
+    //当前输入的表达式
     private String expressionString="";
-    private String nowNumber;
     // 结果
     private String resNum;
-    // 下一步是否需要计算结果
-    private boolean isNeedResult;
-    // 是否已经完成
-    private boolean isFinish;
     // 是否已经输入小数点
     private boolean isDot;
     //是否需要刷新textView
     private boolean isNeedRefresh;
+    //数字栈
     private Stack<Double> numbers = new Stack<>();
+    //操作符栈
     private Stack<Character> opers = new Stack<>();
+    //当前的操作符
     private char[] operator = {'+', '-', '*', '/', '(', ')', '#'};
-    private int[][] priority = {{0, 0, 1, 1, 1, 0, 0},
-            {0, 0, 1, 1, 1, 0, 0},
+    //操作符优先级数组，与以前的操作符优先级不同
+    private int[][] priority = {{0, 0, 0, 0, 1, 0, 0},
+            {0, 0, 0, 0, 1, 0, 0},
             {0, 0, 0, 0, 1, 0, 0},
             {0, 0, 0, 0, 1, 0, 0},
             {1, 1, 1 ,1, 1, -1, -2},
             {0, 0, 0, 0, -2, 0, 0},
             {1, 1, 1, 1, 1, -2, -3}};
+    /*/
+    * 函数名：onCreate
+    * 函数功能：创建窗口(重载的方法)
+    * 函数参数：
+    * 返回值：无
+    * */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -43,7 +50,12 @@ public class MainActivity extends AppCompatActivity {
         this.resultView = (TextView) this.findViewById(R.id.resultView);
         clearData();
     }
-    //设置横竖屏
+    /*/
+     * 函数名：
+     * 函数功能：设置横竖屏
+     * 函数参数：
+     * 返回值：无
+     * */
     @Override
     public void onConfigurationChanged (Configuration newConfig){
 
@@ -56,15 +68,17 @@ public class MainActivity extends AppCompatActivity {
             String str = resultView.getText().toString();
             setContentView(R.layout.activity_main);
             this.resultView = (TextView) this.findViewById(R.id.resultView);
+            isNeedRefresh=true;
             refreshResultView(str);
         } else if ( mCurrentOrientation == Configuration.ORIENTATION_LANDSCAPE ) {//横屏
             System.out.println("the result is"+resultView.getText().toString());
             String str = resultView.getText().toString();
             setContentView(R.layout.activity_main_land);
             this.resultView = (TextView) this.findViewById(R.id.resultViewLand);
+            isNeedRefresh=true;
             refreshResultView(str);
-        }
 
+        }
     }
 
     public void onBtnClick(View view){
@@ -76,7 +90,11 @@ public class MainActivity extends AppCompatActivity {
             //如果数字中已经存在小数点，又重复点击小数点，不处理
             if(isDot&&text.equals(".")){
                 return;
-            }else {//否则，将点击的数字存起来
+            }else if(text.endsWith("π")){
+                isNeedRefresh = true;
+                refreshResultView("Error");
+                clearData();
+            } else {//否则，将点击的数字存起来
                 refreshResultView(text);
                 expressionString+=text;
                 System.out.println(expressionString);
@@ -84,12 +102,35 @@ public class MainActivity extends AppCompatActivity {
         }else {
             //如果点击"+"、"-"、"*"、"/"、"%"
             if(text.equals("+")||text.equals("-")||text.equals("*")||text.equals("/")||text.equals("(")||text.equals(")")){
-                //如果是重复点击这些运算符，不处理
-                if(text.equals("(")){
-                    
+
+                if(text.equals("(")&&(expressionString.endsWith("0")||expressionString.endsWith("1")||expressionString.endsWith("2")
+                        ||expressionString.endsWith("3")||expressionString.endsWith("4")||expressionString.endsWith("5")
+                        ||expressionString.endsWith("6")||expressionString.endsWith("7")||expressionString.endsWith("8")
+                        ||expressionString.endsWith("9"))){
+                    return;
                 }
-                if(expressionString.endsWith("+")||expressionString.endsWith("-")||expressionString.endsWith("*")||
-                        expressionString.endsWith("/")){
+                if(text.equals(")")&&(expressionString.endsWith("+")||expressionString.endsWith("-")||expressionString.endsWith("*")
+                        ||expressionString.endsWith("/"))){
+                    return;
+                }
+                if(text.equals(")")){
+                    int rBracket = 0;
+                    int lBracket = 0;
+                    for(int i = 0; i < expressionString.length();i++){
+                        if(expressionString.charAt(i)=='('){
+                            rBracket++;
+                        }
+                        if(expressionString.charAt(i)==')'){
+                            lBracket++;
+                        }
+                    }
+                    if(rBracket<=lBracket){
+                        return;
+                    }
+                }
+                //如果是重复点击这些运算符，不处理
+                if(!text.equals("(")&&(expressionString.endsWith("+")||expressionString.endsWith("-")||expressionString.endsWith("*")||
+                        expressionString.endsWith("/"))){
                     return;
                 }else {//否则，运算符入栈
                     double number = Double.parseDouble(resultView.getText().toString());
@@ -100,7 +141,6 @@ public class MainActivity extends AppCompatActivity {
 //                    refreshResultView("");
                     if(canCal(text.charAt(0))){
                         isNeedRefresh=true;
-                        compute(numbers.pop(),numbers.pop(),opers.pop());
                         refreshResultView(resNum);
                     }
                     expressionString+=text;
@@ -110,9 +150,68 @@ public class MainActivity extends AppCompatActivity {
                 clearData();
                 isNeedRefresh=true;
                 refreshResultView("0");
+            } else if(text.equals("=")){
+                double number = Double.parseDouble(resultView.getText().toString());
+                numbers.push(number);
+                System.out.println("push:"+numbers.peek());
+                System.out.println("now text is "+ text);
+                if(canCal('#')){
+                    isNeedRefresh=true;
+                    refreshResultView(resNum);
+                }
+                clearData();
+            } else if(text.equals("lnX")||text.equals("sin")||text.equals("exp")||text.equals("cos")||text.equals("tan")
+                    ||text.equals("sqrt")){
+                if(expressionString.endsWith("+")||expressionString.endsWith("-")||expressionString.endsWith("*")||
+                        expressionString.endsWith("/")){
+                    return;
+                }
+                double number = Double.parseDouble(resultView.getText().toString());
+                numbers.push(number);
+                System.out.println("push:"+numbers.peek());
+                System.out.println("now text is "+ text);
+                double x = numbers.pop();
+                switch (text){
+                    case "lnX":
+                        x = Math.log(x);
+                        break;
+                    case "exp":
+                        x = Math.exp(x);
+                        break;
+                    case "sqrt":
+                        x = Math.pow(x,0.5);
+                        break;
+                    case "sin":
+                        x = Math.sin(x);
+                        break;
+                    case "cos":
+                        x = Math.cos(x);
+                        break;
+                    case "tan":
+                        x = Math.tan(x);
+                        break;
+                }
+                numbers.push(x);
+                isNeedRefresh =true;
+                refreshResultView(x+"");
+            }else if(text.equals("π")){
+                if(expressionString.endsWith("0")||expressionString.endsWith("1")||expressionString.endsWith("2")
+                        ||expressionString.endsWith("3")||expressionString.endsWith("4")||expressionString.endsWith("5")
+                        ||expressionString.endsWith("6")||expressionString.endsWith("7")||expressionString.endsWith("8")
+                        ||expressionString.endsWith("9")){
+                    return;
+                }
+                numbers.push(3.14);
             }
             isNeedRefresh=true;
         }
+    }
+    public boolean isNum(String str){
+        if(str.equals("0")||str.equals("1")||str.equals("2")||str.equals("3")||str.equals("4")||str.equals("5")
+                ||str.equals("6")||str.equals("7")||str.equals("8")||str.equals("9")){
+            return true;
+        }
+        return false;
     }
     public boolean canCal(char op){
         int col = 0;
@@ -129,9 +228,16 @@ public class MainActivity extends AppCompatActivity {
                 break;
             }
         }
+        System.out.println("priority is "+priority[row][col]);
         if(priority[row][col] == 1) {
             opers.push(op);
         } else if(priority[row][col] == 0) {
+            compute(numbers.pop(),numbers.pop(),opers.pop());
+            if(op==')'){
+                opers.pop();
+                return true;
+            }
+            opers.push(op);
             return true;
         } else if(priority[row][col] == -1) {
             opers.pop();
@@ -140,12 +246,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void clearData(){
-        nowNumber = "";
         resNum = "";
-        isNeedResult = false;
-        isFinish = false;
         isDot = false;
-        isNeedRefresh=false;
+        isNeedRefresh=true;
         numbers.clear();
         opers.clear();
         opers.push('#');
@@ -154,10 +257,11 @@ public class MainActivity extends AppCompatActivity {
     // 刷新TextView：输完运算符
     public void refreshResultView(String addStr){
         String str = resultView.getText().toString();
-        if (str.equals("0")||isNeedRefresh){
+        if (isNeedRefresh||(str.equals("0")&&!addStr.equals("."))){
             isDot=false;
             isNeedRefresh=false;
             str = "";
+            System.out.println("clear!");
         }
         if(addStr.equals(".")&&!isDot){
             isDot=true;
@@ -172,14 +276,17 @@ public class MainActivity extends AppCompatActivity {
             case '+':
                 result = pNumber+nNumber;
                 numbers.push(result);
+                System.out.println("add result push:"+numbers.peek());
                 break;
             case '-':
                 result = pNumber-nNumber;
                 numbers.push(result);
+                System.out.println("sub result push:"+numbers.peek());
                 break;
             case '*':
                 result = pNumber*nNumber;
                 numbers.push(result);
+                System.out.println("mul result push:"+numbers.peek());
                 break;
             case '/':
                 if(nNumber == 0) {
@@ -188,10 +295,12 @@ public class MainActivity extends AppCompatActivity {
                 }
                 result = pNumber / nNumber;
                 numbers.push(result);
+                System.out.println("div result push:"+numbers.peek());
                 break;
         }
         System.out.println("res:"+result);
-        resNum = result+"";
+        DecimalFormat df = new DecimalFormat("#.00");
+        resNum=df.format(result);
         return resNum;
     }
 }
